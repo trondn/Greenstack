@@ -23,7 +23,7 @@
 #include <stdexcept>
 
 namespace Greenstack {
-    class LIBGREENSTACK_PUBLIC_API Buffer {
+    class Buffer {
     public:
         virtual ~Buffer() {}
 
@@ -31,12 +31,12 @@ namespace Greenstack {
         * Get the pointer to the data area of this buffer. It has to be available
         * for the lifefime of the Buffer object.
         */
-        virtual uint8_t *getData(void) const = 0;
+        virtual uint8_t *getData() const = 0;
 
         /**
         * Get the size of this buffer.
         */
-        virtual const size_t getSize(void) const = 0;
+        virtual const size_t getSize() const = 0;
 
         virtual void resize(size_t new_size) {
             if (supportsResize()) {
@@ -46,12 +46,12 @@ namespace Greenstack {
             }
         }
 
-        virtual bool supportsResize(void) const {
+        virtual bool supportsResize() const {
             return false;
         }
     };
 
-    class LIBGREENSTACK_PUBLIC_API ByteArrayBuffer : public Buffer {
+    class ByteArrayBuffer : public Buffer {
     public:
         ByteArrayBuffer() : Buffer() {
         }
@@ -63,23 +63,23 @@ namespace Greenstack {
 
         virtual ~ByteArrayBuffer() {}
 
-        std::vector<uint8_t> &getBackend(void) {
+        std::vector<uint8_t> &getBackend() {
             return buffer;
         }
 
-        virtual uint8_t *getData(void) const {
+        virtual uint8_t *getData() const override {
             return const_cast<uint8_t*>(buffer.data());
         }
 
-        virtual const size_t getSize(void) const {
+        virtual const size_t getSize() const override {
             return buffer.size();
         }
 
-        virtual void resize(size_t new_size) {
+        virtual void resize(size_t new_size) override {
             buffer.resize(new_size);
         }
 
-        virtual bool supportsResize(void) const {
+        virtual bool supportsResize() const override {
             return true;
         }
 
@@ -87,25 +87,32 @@ namespace Greenstack {
         std::vector<uint8_t> buffer;
     };
 
-    class LIBGREENSTACK_PUBLIC_API FixedByteBuffer : public Buffer {
+    class FixedByteBuffer : public Buffer {
     public:
-        FixedByteBuffer(size_t size) : Buffer() {
+        FixedByteBuffer(uint8_t *ptr, size_t sz) : Buffer(), allocated(false), data(ptr), size(sz) {
+            data = ptr;
+        }
+
+        FixedByteBuffer(size_t sz) : Buffer(), allocated(true), data(new uint8_t[sz]), size(sz) {
             data = new uint8_t[size];
         }
 
         virtual ~FixedByteBuffer() {
-            delete []data;
+            if (allocated) {
+                delete []data;
+            }
         }
 
-        virtual uint8_t *getData(void) const {
+        virtual uint8_t *getData() const override {
             return data;
         }
 
-        virtual const size_t getSize(void) const {
+        virtual const size_t getSize() const override {
             return size;
         }
 
     private:
+        bool allocated;
         uint8_t *data;
         size_t size;
     };

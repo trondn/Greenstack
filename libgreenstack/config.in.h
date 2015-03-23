@@ -9,6 +9,7 @@
 #endif
 
 #cmakedefine HAVE_HTONLL
+#cmakedefine WORDS_BIGENDIAN
 
 #ifdef __cplusplus
 extern "C" {

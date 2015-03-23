@@ -21,6 +21,8 @@
 #include <cstdint>
 #include <libgreenstack/visibility.h>
 #include <libgreenstack/FlexHeader.h>
+#include <libgreenstack/Opcodes.h>
+#include <libgreenstack/Reader.h>
 #include <ostream>
 
 namespace Greenstack {
@@ -28,27 +30,35 @@ namespace Greenstack {
 
     class LIBGREENSTACK_PUBLIC_API Message {
     public:
-        static Message *create(const std::vector<uint8_t> &vector, size_t offset = 0, size_t end = std::numeric_limits<size_t>::max());
+        static Message *create(const std::vector<uint8_t> &vector, size_t offset = 0) {
+            return create(vector, offset, vector.size());
+        }
+        static Message *create(const std::vector<uint8_t> &vector, size_t offset, size_t end) {
+            ByteArrayReader reader(vector, offset, end);
+            return create(reader, end);
+        }
+
+        static Message *create(Reader &reader, size_t size);
 
         virtual ~Message();
 
         void setOpaque(uint32_t value);
-        uint32_t getOpaque(void) const;
+        uint32_t getOpaque() const;
 
-        void setOpcode(uint16_t value);
-        uint16_t getOpcode(void) const;
+        void setOpcode(opcode_t value);
+        opcode_t getOpcode() const;
 
         void setFenceBit(bool enable);
-        bool isFenceBitSet(void) const;
+        bool isFenceBitSet() const;
 
         void setMoreBit(bool enable);
-        bool isMoreBitSet(void) const;
+        bool isMoreBitSet() const;
 
         void setQuietBit(bool enable);
-        bool isQuietBitSet(void) const;
+        bool isQuietBitSet() const;
 
-        Greenstack::FlexHeader &getFlexHeader(void);
-        const Greenstack::FlexHeader &getFlexHeader(void) const;
+        Greenstack::FlexHeader &getFlexHeader();
+        const Greenstack::FlexHeader &getFlexHeader() const;
 
         /**
         * Set the payload for the message
@@ -67,13 +77,18 @@ namespace Greenstack {
         *               request
         * @return the number of bytes the encoded object occupied
         */
-        size_t encode(std::vector<uint8_t> &vector, size_t offset = 0) const;
+        virtual size_t encode(std::vector<uint8_t> &vector, size_t offset = 0) const;
 
     protected:
         Message(bool response);
 
+        /**
+        * validate that the payload is correct. Throw an exception otherwise
+        */
+        virtual void validate();
+
         uint32_t opaque;
-        uint16_t opcode;
+        opcode_t opcode;
 
         struct Flags {
             bool response : 1;
@@ -86,6 +101,10 @@ namespace Greenstack {
         } flags;
 
         FlexHeader flexHeader;
+
         std::vector<uint8_t> payload;
+
+    private:
+        static Message* createInstance(bool response, opcode_t opcode);
     };
 }

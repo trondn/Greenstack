@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <vector>
 #include <libgreenstack/visibility.h>
+#include <libgreenstack/Reader.h>
 
 namespace Greenstack {
     class Message;
@@ -29,6 +30,7 @@ namespace Greenstack {
         static size_t encode(const Message &message, std::vector<uint8_t> &vector, size_t offset = 0) {
             return encode(&message, vector, offset);
         }
+
         static size_t encode(const Message *message, std::vector<uint8_t> &vector, size_t offset = 0);
 
         /**
@@ -41,11 +43,18 @@ namespace Greenstack {
         * @return the newly created message
         * @todo harden the function to validate the input and throw exception if its incorrect
         */
-        static Message *create(const std::vector<uint8_t> &vector, size_t offset, size_t &nbytes);
+        static Message *create(const std::vector<uint8_t> &vector, size_t offset, size_t &nbytes) {
+            ByteArrayReader reader(vector, offset);
+            Message *ret = create(reader);
+            nbytes = reader.getOffset() - offset;
+            return ret;
+        }
 
         static Message *create(const std::vector<uint8_t> &vector, size_t offset = 0) {
             size_t nbytes;
             return create(vector, offset, nbytes);
         }
+
+        static Message *create(Reader &reader);
     };
 }

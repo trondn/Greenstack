@@ -29,5 +29,9 @@ namespace Greenstack {
         Request();
 
         virtual ~Request();
+    protected:
+        Request(opcode_t opcode) : Message(false) {
+            setOpcode(opcode);
+        }
     };
 }

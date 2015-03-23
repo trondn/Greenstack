@@ -24,10 +24,10 @@ Greenstack::Response::Response() : Greenstack::Message(true), status(std::numeri
 Greenstack::Response::~Response() {
 }
 
-void Greenstack::Response::setStatus(uint16_t value) {
+void Greenstack::Response::setStatus(Greenstack::status_t value) {
     status = value;
 }
 
-uint16_t Greenstack::Response::getStatus(void) const {
+Greenstack::status_t Greenstack::Response::getStatus() const {
     return status;
 }

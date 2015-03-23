@@ -25,6 +25,7 @@
 namespace Greenstack {
     class Writer;
     class ByteArrayReader;
+    class Reader;
     class Request;
     class Response;
     class Message;
@@ -32,54 +33,43 @@ namespace Greenstack {
     class LIBGREENSTACK_PUBLIC_API FlexHeader {
     public:
         static FlexHeader create(ByteArrayReader &reader);
+        static FlexHeader create(Reader &reader, size_t size);
 
         bool isEmpty() const {
             return header.empty();
         }
 
         void setLaneId(const std::string &lane);
-        bool haveLaneId(void) const;
-        std::string getLaneId(void) const;
-
-        void setCompression(const std::string &compression);
-        bool haveCompression(void) const;
-        std::string getCompression(void) const;
-
-        void setDatatype(const std::string &datatype);
-        bool haveDatatype(void) const;
-        std::string getDatatype(void) const;
-
-        void setCAS(const std::vector<uint8_t> &cas);
-        bool haveCAS(void) const;
-        std::vector<uint8_t> getCAS(void) const;
+        bool haveLaneId() const;
+        std::string getLaneId() const;
 
         void setTXID(const std::string &txid);
-        bool haveTXID(void) const;
-        std::string getTXID(void) const;
+        bool haveTXID() const;
+        std::string getTXID() const;
 
         void setPriority(uint8_t priority);
-        bool havePriority(void) const;
-        uint8_t getPriority(void) const;
+        bool havePriority() const;
+        uint8_t getPriority() const;
 
         void setDcpId(const std::string &dcpid);
-        bool haveDcpId(void) const;
-        std::string getDcpId(void) const;
+        bool haveDcpId() const;
+        std::string getDcpId() const;
 
         void setVbucketId(uint16_t vbid);
-        bool haveVbucketId(void) const;
-        uint16_t getVbucketId(void) const;
+        bool haveVbucketId() const;
+        uint16_t getVbucketId() const;
 
         void setHash(uint32_t hash);
-        bool haveHash(void) const;
-        uint32_t getHash(void) const;
+        bool haveHash() const;
+        uint32_t getHash() const;
 
         void setTimeout(uint32_t value);
-        bool haveTimeout(void) const;
-        uint32_t getTimeout(void) const;
+        bool haveTimeout() const;
+        uint32_t getTimeout() const;
 
         void setCommandTimings(const std::string &value);
-        bool haveCommandTimings(void) const;
-        std::string getCommandTimings(void) const;
+        bool haveCommandTimings() const;
+        std::string getCommandTimings() const;
 
     protected:
         size_t encode(Writer &writer) const;

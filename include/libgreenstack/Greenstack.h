@@ -20,3 +20,17 @@
 #include <libgreenstack/Frame.h>
 #include <libgreenstack/Request.h>
 #include <libgreenstack/Response.h>
+#include <libgreenstack/Opcodes.h>
+#include <libgreenstack/Reader.h>
+#include <libgreenstack/Writer.h>
+#include <libgreenstack/Status.h>
+#include <libgreenstack/core/Hello.h>
+#include <libgreenstack/core/SaslAuth.h>
+#include <libgreenstack/memcached/AssumeRole.h>
+#include <libgreenstack/memcached/CreateBucket.h>
+#include <libgreenstack/memcached/DeleteBucket.h>
+#include <libgreenstack/memcached/Get.h>
+#include <libgreenstack/memcached/ListBuckets.h>
+#include <libgreenstack/memcached/SelectBucket.h>
+#include <libgreenstack/memcached/Mutation.h>
+

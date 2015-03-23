@@ -16,13 +16,26 @@
  */
 
 #include <libgreenstack/Message.h>
+#include <libgreenstack/Frame.h>
+#include <libgreenstack/Opcodes.h>
+#include <libgreenstack/Response.h>
+#include <libgreenstack/Request.h>
+#include <libgreenstack/core/Hello.h>
+#include <libgreenstack/Reader.h>
+#include <libgreenstack/core/SaslAuth.h>
+#include <libgreenstack/Writer.h>
+
 #include <iostream>
 #include <iomanip>
 #include <cassert>
-#include <libgreenstack/Response.h>
-#include <libgreenstack/Request.h>
-#include "Writer.h"
-#include "Reader.h"
+#include <stdexcept>
+#include <libgreenstack/memcached/Mutation.h>
+#include <libgreenstack/memcached/AssumeRole.h>
+#include <libgreenstack/memcached/CreateBucket.h>
+#include <libgreenstack/memcached/DeleteBucket.h>
+#include <libgreenstack/memcached/ListBuckets.h>
+#include <libgreenstack/memcached/SelectBucket.h>
+#include <libgreenstack/memcached/Get.h>
 
 Greenstack::Message::Message(bool response) : opaque(std::numeric_limits<uint32_t>::max()),
                                               opcode(std::numeric_limits<uint16_t>::max()) {
@@ -38,15 +51,15 @@ void Greenstack::Message::setOpaque(uint32_t value) {
     opaque = value;
 }
 
-uint32_t Greenstack::Message::getOpaque(void) const {
+uint32_t Greenstack::Message::getOpaque() const {
     return opaque;
 }
 
-void Greenstack::Message::setOpcode(uint16_t value) {
+void Greenstack::Message::setOpcode(opcode_t value) {
     opcode = value;
 }
 
-uint16_t Greenstack::Message::getOpcode(void) const {
+Greenstack::opcode_t Greenstack::Message::getOpcode() const {
     return opcode;
 }
 
@@ -54,7 +67,7 @@ void Greenstack::Message::setFenceBit(bool enable) {
     flags.fence = enable;
 }
 
-bool Greenstack::Message::isFenceBitSet(void) const {
+bool Greenstack::Message::isFenceBitSet() const {
     return flags.fence;
 }
 
@@ -62,7 +75,7 @@ void Greenstack::Message::setMoreBit(bool enable) {
     flags.more = enable;
 }
 
-bool Greenstack::Message::isMoreBitSet(void) const {
+bool Greenstack::Message::isMoreBitSet() const {
     return flags.more;
 }
 
@@ -70,20 +83,24 @@ void Greenstack::Message::setQuietBit(bool enable) {
     flags.quiet = enable;
 }
 
-bool Greenstack::Message::isQuietBitSet(void) const {
+bool Greenstack::Message::isQuietBitSet() const {
     return flags.quiet;
 }
 
-Greenstack::FlexHeader &Greenstack::Message::getFlexHeader(void) {
+Greenstack::FlexHeader &Greenstack::Message::getFlexHeader() {
     return flexHeader;
 }
 
-const Greenstack::FlexHeader &Greenstack::Message::getFlexHeader(void) const {
+const Greenstack::FlexHeader &Greenstack::Message::getFlexHeader() const {
     return flexHeader;
 }
 
 void Greenstack::Message::setPayload(std::vector<uint8_t> &data) {
     payload.assign(data.begin(), data.end());
+}
+
+void Greenstack::Message::validate() {
+    // Empty
 }
 
 /**
@@ -156,9 +173,9 @@ size_t Greenstack::Message::encode(std::vector<uint8_t> &vector, size_t offset) 
     return writer.getOffset();
 }
 
-Greenstack::Message *Greenstack::Message::create(const std::vector<uint8_t> &vector, size_t offset, size_t end) {
-    ByteArrayReader reader(vector, offset, end);
+Greenstack::Message *Greenstack::Message::create(Greenstack::Reader &reader, size_t size) {
     Message *ret;
+    size_t endOffset = reader.getOffset() + size;
 
     uint32_t opaque;
     uint16_t opcode;
@@ -166,40 +183,117 @@ Greenstack::Message *Greenstack::Message::create(const std::vector<uint8_t> &vec
 
     reader.read(opaque);
     reader.read(opcode);
-    reader.read(reinterpret_cast<uint8_t*>(&flags), 1);
+    reader.read(reinterpret_cast<uint8_t *>(&flags), 1);
 
-    if (flags.response) {
-        ret = new Response();
-    } else {
-        ret = new Request();
+    if (flags.next) {
+        throw std::runtime_error("Only one flag byte is defined");
     }
 
+    if (flags.unassigned) {
+        throw std::runtime_error("Do not use unassigned bits");
+    }
+
+    ret = createInstance(flags.response, opcode);
     ret->opaque = opaque;
     ret->opcode = opcode;
     ret->flags = flags;
-    offset += 7; // skip header
 
     if (flags.response) {
         Response *r = dynamic_cast<Response *>(ret);
         uint16_t status;
         reader.read(status);
         r->setStatus(status);
-        offset += 2; // skip status
     }
 
     if (flags.flexHeaderPresent) {
         uint32_t nbytes;
         reader.read(nbytes);
-        offset += 4; // skip length
-        ByteArrayReader in(vector, offset, offset + nbytes);
+
+        std::vector<uint8_t> data;
+        data.resize(nbytes);
+        reader.read(data.data(), nbytes);
+        ByteArrayReader in(data);
         auto flex = FlexHeader::create(in);
         ret->flexHeader = flex;
-        reader.skip(nbytes);
     }
 
     // Set the content
-    ret->payload.resize(reader.getReminder());
-    reader.read(ret->payload.data(), reader.getReminder());
+    size_t payloadSize = endOffset - reader.getOffset();
+    ret->payload.resize(payloadSize);
+    reader.read(ret->payload.data(), payloadSize);
+
+    try {
+        ret->validate();
+    } catch (std::runtime_error &err) {
+        delete ret;
+        throw err;
+    }
 
     return ret;
+}
+
+Greenstack::Message *Greenstack::Message::createInstance(bool response, Greenstack::opcode_t opcode) {
+    switch (opcode) {
+        case Greenstack::Opcodes::Hello:
+            if (response) {
+                return new HelloResponse;
+            } else {
+                return new HelloRequest;
+            }
+        case Greenstack::Opcodes::SaslAuth:
+            if (response) {
+                return new SaslAuthResponse;
+            } else {
+                return new SaslAuthRequest;
+            }
+        case Greenstack::Opcodes::Mutation:
+            if (response) {
+                return new MutationResponse;
+            } else {
+                return new MutationRequest;
+            }
+        case Greenstack::Opcodes::AssumeRole:
+            if (response) {
+                return new AssumeRoleResponse;
+            } else {
+                return new AssumeRoleRequest;
+            }
+        case Greenstack::Opcodes::CreateBucket:
+            if (response) {
+                return new CreateBucketResponse;
+            } else {
+                return new CreateBucketRequest;
+            }
+        case Greenstack::Opcodes::DeleteBucket:
+            if (response) {
+                return new DeleteBucketResponse;
+            } else {
+                return new DeleteBucketRequest;
+            }
+        case Greenstack::Opcodes::SelectBucket:
+            if (response) {
+                return new SelectBucketResponse;
+            } else {
+                return new SelectBucketRequest;
+            }
+        case Greenstack::Opcodes::ListBuckets:
+            if (response) {
+                return new ListBucketsResponse;
+            } else {
+                return new ListBucketsRequest;
+            }
+        case Greenstack::Opcodes::Get:
+            if (response) {
+                return new GetResponse;
+            } else {
+                return new GetRequest;
+            }
+
+        default:
+            if (response) {
+                return new Response;
+            } else {
+                return new Request;
+            }
+    }
 }

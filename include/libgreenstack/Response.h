@@ -19,6 +19,7 @@
 #include <vector>
 #include <libgreenstack/visibility.h>
 #include <libgreenstack/Message.h>
+#include <libgreenstack/Status.h>
 
 namespace Greenstack {
     class LIBGREENSTACK_PUBLIC_API Response : public Greenstack::Message {
@@ -27,10 +28,14 @@ namespace Greenstack {
         virtual ~Response();
 
 
-        void setStatus(uint16_t value);
-        uint16_t getStatus(void) const;
+        void setStatus(status_t value);
+        status_t getStatus() const;
 
     protected:
+        Response(opcode_t opcode, status_t status) : Message(true) {
+            setOpcode(opcode);
+            setStatus(status);
+        }
         uint16_t status;
     };
 }

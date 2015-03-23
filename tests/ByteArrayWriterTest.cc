@@ -16,58 +16,217 @@
  */
 #include <cstdlib>
 #include <iostream>
+#include <libgreenstack/Writer.h>
 #include <iomanip>
+#include <gtest/gtest.h>
 
-#include "../libgreenstack/Writer.h"
-
-using namespace Greenstack;
-
-int main(void) {
-    ByteArrayBuffer buffer;
-    BufferWriter writer(buffer);
-
-    writer.write((uint8_t)0xde);
-    if (buffer.getSize() != 1) {
-        std::cerr << "Invalid size after writing a byte"<< std::endl;
-        exit(EXIT_FAILURE);
-    }
-    writer.write((uint16_t)0xdead);
-    if (buffer.getSize() != 3) {
-        std::cerr << "Invalid size after writing uint16_t"<< std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    writer.write((uint32_t)0xdeadbeef);
-    if (buffer.getSize() != 7) {
-        std::cerr << "Invalid size after writing uint32_t" << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    uint64_t val = 0xdeadbeef;
-    val <<= 32;
-    val |= 0xdeadcafe;
-
-    writer.write(val);
-    if (buffer.getSize() != 15) {
-        std::cerr << "Invalid size after writing uint64_t" << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    uint8_t expected[15] = { 0xde, 0xde, 0xad, 0xde, 0xad, 0xbe, 0xef,
-                             0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xca, 0xfe };
-
-    for (int ii = 1; ii < sizeof(expected); ++ii) {;
-        if (expected[ii] != buffer.getData()[ii]) {
-            std::cerr << "Incorrect value at offset " << ii << " expected "
-                    << std::hex << (unsigned int)expected[ii] << " got "
-                    << std::hex << (unsigned int)buffer.getData()[ii]
-                    << std::endl;
-            exit(EXIT_FAILURE);
+namespace Greenstack {
+    class ByteArrayWriterTest : public ::testing::Test {
+    protected:
+        ByteArrayWriterTest() : writer(new ByteArrayWriter(data)) {
         }
 
+        ~ByteArrayWriterTest() {
+            delete writer;
+        }
+
+        Greenstack::Writer *writer;
+        std::vector<uint8_t> data;
+    };
+
+    TEST_F(ByteArrayWriterTest, WriteUint8_t) {
+        uint8_t val = 0xde;
+        writer->write(val);
+        EXPECT_EQ(1, data.size());
+        EXPECT_EQ(0xde, data[0]);
+    }
+
+    TEST_F(ByteArrayWriterTest, WriteUint16_t) {
+        uint16_t val = 0xdead;
+        writer->write(val);
+        EXPECT_EQ(2, data.size());
+        EXPECT_EQ(0xde, data[0]);
+        EXPECT_EQ(0xad, data[1]);
+    }
+
+    TEST_F(ByteArrayWriterTest, WriteUint32_t) {
+        uint32_t val = 0xdeadbeef;
+        writer->write(val);
+        EXPECT_EQ(4, data.size());
+        EXPECT_EQ(0xde, data[0]);
+        EXPECT_EQ(0xad, data[1]);
+        EXPECT_EQ(0xbe, data[2]);
+        EXPECT_EQ(0xef, data[3]);
+    }
+
+    TEST_F(ByteArrayWriterTest, WriteUint64_t) {
+        uint64_t val = 0xdeadbeef;
+        val <<= 32;
+        val |= 0xbeefdead;
+        writer->write(val);
+        EXPECT_EQ(8, data.size());
+        EXPECT_EQ(0xde, data[0]);
+        EXPECT_EQ(0xad, data[1]);
+        EXPECT_EQ(0xbe, data[2]);
+        EXPECT_EQ(0xef, data[3]);
+        EXPECT_EQ(0xbe, data[4]);
+        EXPECT_EQ(0xef, data[5]);
+        EXPECT_EQ(0xde, data[6]);
+        EXPECT_EQ(0xad, data[7]);
+    }
+
+    TEST_F(ByteArrayWriterTest, PWriteUint8_t) {
+        uint8_t val = 0xde;
+        writer->pwrite(val, 10);
+        EXPECT_EQ(11, data.size());
+        EXPECT_EQ(0xde, data[10]);
+    }
+
+    TEST_F(ByteArrayWriterTest, PWriteUint16_t) {
+        uint16_t val = 0xdead;
+        writer->pwrite(val, 10);
+        EXPECT_EQ(12, data.size());
+        EXPECT_EQ(0xde, data[10]);
+        EXPECT_EQ(0xad, data[11]);
+    }
+
+    TEST_F(ByteArrayWriterTest, PWriteUint32_t) {
+        uint32_t val = 0xdeadbeef;
+        writer->pwrite(val, 10);
+        EXPECT_EQ(14, data.size());
+        EXPECT_EQ(0xde, data[10]);
+        EXPECT_EQ(0xad, data[11]);
+        EXPECT_EQ(0xbe, data[12]);
+        EXPECT_EQ(0xef, data[13]);
+    }
+
+    TEST_F(ByteArrayWriterTest, PWriteUint64_t) {
+        uint64_t val = 0xdeadbeef;
+        val <<= 32;
+        val |= 0xbeefdead;
+        writer->pwrite(val, 10);
+        EXPECT_EQ(18, data.size());
+        EXPECT_EQ(0xde, data[10]);
+        EXPECT_EQ(0xad, data[11]);
+        EXPECT_EQ(0xbe, data[12]);
+        EXPECT_EQ(0xef, data[13]);
+        EXPECT_EQ(0xbe, data[14]);
+        EXPECT_EQ(0xef, data[15]);
+        EXPECT_EQ(0xde, data[16]);
+        EXPECT_EQ(0xad, data[17]);
+    }
+
+    TEST_F(ByteArrayWriterTest, GetOffset) {
+        EXPECT_EQ(0, writer->getOffset());
+        writer->write((uint8_t)0xde);
+        EXPECT_EQ(1, writer->getOffset());
+        writer->write((uint16_t)0xde);
+        EXPECT_EQ(3, writer->getOffset());
     }
 
 
+    class ByteArrayWriterOffsetTest : public ::testing::Test {
+    protected:
+        ByteArrayWriterOffsetTest() : writer(new ByteArrayWriter(data, 100)) {
+        }
 
-    return EXIT_SUCCESS;
+        ~ByteArrayWriterOffsetTest() {
+            delete writer;
+        }
+
+        Greenstack::Writer *writer;
+        std::vector<uint8_t> data;
+    };
+
+    TEST_F(ByteArrayWriterOffsetTest, WriteUint8_t) {
+        uint8_t val = 0xde;
+        writer->write(val);
+        EXPECT_EQ(101, data.size());
+        EXPECT_EQ(0xde, data[100]);
+    }
+
+    TEST_F(ByteArrayWriterOffsetTest, WriteUint16_t) {
+        uint16_t val = 0xdead;
+        writer->write(val);
+        EXPECT_EQ(102, data.size());
+        EXPECT_EQ(0xde, data[100]);
+        EXPECT_EQ(0xad, data[101]);
+    }
+
+    TEST_F(ByteArrayWriterOffsetTest, WriteUint32_t) {
+        uint32_t val = 0xdeadbeef;
+        writer->write(val);
+        EXPECT_EQ(104, data.size());
+        EXPECT_EQ(0xde, data[100]);
+        EXPECT_EQ(0xad, data[101]);
+        EXPECT_EQ(0xbe, data[102]);
+        EXPECT_EQ(0xef, data[103]);
+    }
+
+    TEST_F(ByteArrayWriterOffsetTest, WriteUint64_t) {
+        uint64_t val = 0xdeadbeef;
+        val <<= 32;
+        val |= 0xbeefdead;
+        writer->write(val);
+        EXPECT_EQ(108, data.size());
+        EXPECT_EQ(0xde, data[100]);
+        EXPECT_EQ(0xad, data[101]);
+        EXPECT_EQ(0xbe, data[102]);
+        EXPECT_EQ(0xef, data[103]);
+        EXPECT_EQ(0xbe, data[104]);
+        EXPECT_EQ(0xef, data[105]);
+        EXPECT_EQ(0xde, data[106]);
+        EXPECT_EQ(0xad, data[107]);
+    }
+
+    TEST_F(ByteArrayWriterOffsetTest, PWriteUint8_t) {
+        uint8_t val = 0xde;
+        writer->pwrite(val, 10);
+        EXPECT_EQ(111, data.size());
+        EXPECT_EQ(0xde, data[110]);
+    }
+
+    TEST_F(ByteArrayWriterOffsetTest, PWriteUint16_t) {
+        uint16_t val = 0xdead;
+        writer->pwrite(val, 10);
+        EXPECT_EQ(112, data.size());
+        EXPECT_EQ(0xde, data[110]);
+        EXPECT_EQ(0xad, data[111]);
+    }
+
+    TEST_F(ByteArrayWriterOffsetTest, PWriteUint32_t) {
+        uint32_t val = 0xdeadbeef;
+        writer->pwrite(val, 10);
+        EXPECT_EQ(114, data.size());
+        EXPECT_EQ(0xde, data[110]);
+        EXPECT_EQ(0xad, data[111]);
+        EXPECT_EQ(0xbe, data[112]);
+        EXPECT_EQ(0xef, data[113]);
+    }
+
+    TEST_F(ByteArrayWriterOffsetTest, PWriteUint64_t) {
+        uint64_t val = 0xdeadbeef;
+        val <<= 32;
+        val |= 0xbeefdead;
+        writer->pwrite(val, 10);
+        EXPECT_EQ(118, data.size());
+        EXPECT_EQ(0xde, data[110]);
+        EXPECT_EQ(0xad, data[111]);
+        EXPECT_EQ(0xbe, data[112]);
+        EXPECT_EQ(0xef, data[113]);
+        EXPECT_EQ(0xbe, data[114]);
+        EXPECT_EQ(0xef, data[115]);
+        EXPECT_EQ(0xde, data[116]);
+        EXPECT_EQ(0xad, data[117]);
+    }
+
+    TEST_F(ByteArrayWriterOffsetTest, GetOffset) {
+        EXPECT_EQ(0, writer->getOffset());
+        writer->write((uint8_t)0xde);
+        EXPECT_EQ(1, writer->getOffset());
+        writer->write((uint16_t)0xde);
+        EXPECT_EQ(3, writer->getOffset());
+    }
+
+
 }

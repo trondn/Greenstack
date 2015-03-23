@@ -16,16 +16,18 @@
  */
 
 #include <libgreenstack/FlexHeader.h>
+#include <libgreenstack/Writer.h>
+#include <libgreenstack/Reader.h>
 #include <iostream>
 #include <sstream>
-#include "Writer.h"
-#include "Reader.h"
+#include <cstddef>
+#include <stdexcept>
 
 // @todo.. Should I refactor this to something like..
 class Option {
 public:
-    virtual uint16_t getId(void) = 0;
-    virtual const char *getName(void) = 0;
+    virtual uint16_t getId() = 0;
+    virtual const char *getName() = 0;
     virtual void write(Greenstack::Writer &writer) = 0;
 };
 
@@ -54,10 +56,16 @@ size_t Greenstack::FlexHeader::encode(Greenstack::Writer &writer) const {
 }
 
 Greenstack::FlexHeader Greenstack::FlexHeader::create(ByteArrayReader &reader) {
+    return create(reader, reader.getRemainder());
+}
+
+Greenstack::FlexHeader Greenstack::FlexHeader::create(Greenstack::Reader &reader, size_t size) {
+    size_t endOffset = reader.getOffset() + size;
+
     FlexHeader ret;
 
     // each field is at least 2 byte key, 2 byte length
-    while (reader.getReminder() > 3) {
+    while (reader.getOffset() < endOffset) {
         uint16_t opcode;
         uint16_t length;
         reader.read(opcode);
@@ -67,6 +75,11 @@ Greenstack::FlexHeader Greenstack::FlexHeader::create(ByteArrayReader &reader) {
         reader.read(value.data(), length);
 
         ret.insertField(opcode, value.data(), value.size());
+    }
+
+    // There should not be anything left!!
+    if (reader.getOffset() != endOffset) {
+        throw std::runtime_error("Incorrect encoding of Flex Header");
     }
 
     return ret;
@@ -109,11 +122,11 @@ void Greenstack::FlexHeader::setLaneId(const std::string &lane) {
     insertField(LANE_ID, reinterpret_cast<const uint8_t*>(lane.data()), lane.length());
 }
 
-bool Greenstack::FlexHeader::haveLaneId(void) const {
+bool Greenstack::FlexHeader::haveLaneId() const {
     return header.find(LANE_ID) != header.end();
 }
 
-std::string Greenstack::FlexHeader::getLaneId(void) const {
+std::string Greenstack::FlexHeader::getLaneId() const {
     auto iter = header.find(LANE_ID);
 
     if (iter == header.end()) {
@@ -124,75 +137,15 @@ std::string Greenstack::FlexHeader::getLaneId(void) const {
     return ret;
 }
 
-void Greenstack::FlexHeader::setCompression(const std::string &compression) {
-    insertField(COMPRESSION, reinterpret_cast<const uint8_t*>(compression.data()), compression.length());
-}
-
-bool Greenstack::FlexHeader::haveCompression(void) const {
-    return header.find(COMPRESSION) != header.end();
-}
-
-std::string Greenstack::FlexHeader::getCompression(void) const {
-    auto iter = header.find(COMPRESSION);
-
-    if (iter == header.end()) {
-        throw std::runtime_error("Compression not present");
-    }
-
-    std::string ret(reinterpret_cast<const char*>(iter->second.data()), iter->second.size());
-    return ret;
-}
-
-void Greenstack::FlexHeader::setDatatype(const std::string &datatype) {
-    insertField(DATATYPE, reinterpret_cast<const uint8_t*>(datatype.data()), datatype.length());
-}
-
-bool Greenstack::FlexHeader::haveDatatype(void) const {
-    return header.find(DATATYPE) != header.end();
-}
-
-std::string Greenstack::FlexHeader::getDatatype(void) const {
-    auto iter = header.find(DATATYPE);
-
-    if (iter == header.end()) {
-        throw std::runtime_error("Datatype not present");
-    }
-
-    std::string ret(reinterpret_cast<const char*>(iter->second.data()), iter->second.size());
-    return ret;
-}
-
-void Greenstack::FlexHeader::setCAS(const std::vector<uint8_t> &cas) {
-    if (cas.size() != 8) {
-        throw std::runtime_error("Invalid CAS size");
-    }
-    insertField(CAS, cas.data(), cas.size());
-}
-
-bool Greenstack::FlexHeader::haveCAS(void) const {
-    return header.find(CAS) != header.end();
-}
-
-std::vector<uint8_t> Greenstack::FlexHeader::getCAS(void) const {
-    auto iter = header.find(CAS);
-
-    if (iter == header.end()) {
-        throw std::runtime_error("CAS not present");
-    }
-
-    std::vector<uint8_t> ret(iter->second.begin(), iter->second.end());
-    return ret;
-}
-
 void Greenstack::FlexHeader::setTXID(const std::string &txid) {
     insertField(TXID, reinterpret_cast<const uint8_t*>(txid.data()), txid.length());
 
 }
-bool Greenstack::FlexHeader::haveTXID(void) const {
+bool Greenstack::FlexHeader::haveTXID() const {
     return header.find(TXID) != header.end();
 }
 
-std::string Greenstack::FlexHeader::getTXID(void) const {
+std::string Greenstack::FlexHeader::getTXID() const {
     auto iter = header.find(TXID);
 
     if (iter == header.end()) {
@@ -207,11 +160,11 @@ void Greenstack::FlexHeader::setPriority(uint8_t priority) {
     insertField(PRIORITY, reinterpret_cast<const uint8_t*>(&priority), 1);
 }
 
-bool Greenstack::FlexHeader::havePriority(void) const {
+bool Greenstack::FlexHeader::havePriority() const {
     return header.find(PRIORITY) != header.end();
 }
 
-uint8_t Greenstack::FlexHeader::getPriority(void) const {
+uint8_t Greenstack::FlexHeader::getPriority() const {
     auto iter = header.find(PRIORITY);
 
     if (iter == header.end()) {
@@ -225,11 +178,11 @@ void Greenstack::FlexHeader::setDcpId(const std::string &dcpid) {
     insertField(DCPID, reinterpret_cast<const uint8_t*>(dcpid.data()), dcpid.length());
 }
 
-bool Greenstack::FlexHeader::haveDcpId(void) const {
+bool Greenstack::FlexHeader::haveDcpId() const {
     return header.find(DCPID) != header.end();
 }
 
-std::string Greenstack::FlexHeader::getDcpId(void) const {
+std::string Greenstack::FlexHeader::getDcpId() const {
     auto iter = header.find(DCPID);
 
     if (iter == header.end()) {
@@ -245,11 +198,11 @@ void Greenstack::FlexHeader::setVbucketId(uint16_t vbid) {
     insertField(VBUCKETID, reinterpret_cast<const uint8_t*>(&value), 2);
 }
 
-bool Greenstack::FlexHeader::haveVbucketId(void) const {
+bool Greenstack::FlexHeader::haveVbucketId() const {
     return header.find(VBUCKETID) != header.end();
 }
 
-uint16_t Greenstack::FlexHeader::getVbucketId(void) const {
+uint16_t Greenstack::FlexHeader::getVbucketId() const {
     auto iter = header.find(VBUCKETID);
 
     if (iter == header.end()) {
@@ -266,11 +219,11 @@ void Greenstack::FlexHeader::setHash(uint32_t hash) {
     insertField(HASH, reinterpret_cast<const uint8_t*>(&value), 4);
 }
 
-bool Greenstack::FlexHeader::haveHash(void) const {
+bool Greenstack::FlexHeader::haveHash() const {
     return header.find(HASH) != header.end();
 }
 
-uint32_t Greenstack::FlexHeader::getHash(void) const {
+uint32_t Greenstack::FlexHeader::getHash() const {
     auto iter = header.find(HASH);
 
     if (iter == header.end()) {
@@ -287,11 +240,11 @@ void Greenstack::FlexHeader::setTimeout(uint32_t timeout) {
     insertField(CMD_EXPIRY, reinterpret_cast<const uint8_t*>(&value), 4);
 }
 
-bool Greenstack::FlexHeader::haveTimeout(void) const {
+bool Greenstack::FlexHeader::haveTimeout() const {
     return header.find(CMD_EXPIRY) != header.end();
 }
 
-uint32_t Greenstack::FlexHeader::getTimeout(void) const {
+uint32_t Greenstack::FlexHeader::getTimeout() const {
     auto iter = header.find(CMD_EXPIRY);
 
     if (iter == header.end()) {
@@ -307,11 +260,11 @@ void Greenstack::FlexHeader::setCommandTimings(const std::string &value) {
     insertField(COMMAND_TIMINGS, reinterpret_cast<const uint8_t*>(value.data()), value.length());
 }
 
-bool Greenstack::FlexHeader::haveCommandTimings(void) const {
+bool Greenstack::FlexHeader::haveCommandTimings() const {
     return header.find(COMMAND_TIMINGS) != header.end();
 }
 
-std::string Greenstack::FlexHeader::getCommandTimings(void) const {
+std::string Greenstack::FlexHeader::getCommandTimings() const {
     auto iter = header.find(COMMAND_TIMINGS);
 
     if (iter == header.end()) {

@@ -23,7 +23,11 @@
 #elif defined __GNUC__
 #define LIBGREENSTACK_PUBLIC_API __attribute__ ((visibility("default")))
 #elif defined(_MSC_VER)
-#define LIBGREENSTACK_PUBLIC_API __declspec(dllexport)
+// We're currently building a static archive on Windows due
+// to all of the warnings from exporting STL members from the
+// dll.. I guess I need to resolve that in some way..
+//__declspec(dllexport)
+#define LIBGREENSTACK_PUBLIC_API
 #else
 /* unknown compiler */
 #define LIBGREENSTACK_PUBLIC_API
@@ -32,7 +36,8 @@
 #else
 
 #if defined(_MSC_VER)
-#define LIBGREENSTACK_PUBLIC_API __declspec(dllimport)
+#define LIBGREENSTACK_PUBLIC_API
+// __declspec(dllimport)
 #else
 #define LIBGREENSTACK_PUBLIC_API
 #endif

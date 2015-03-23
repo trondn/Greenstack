@@ -16,11 +16,9 @@
  */
 #include <libgreenstack/Frame.h>
 #include <libgreenstack/Message.h>
+#include <libgreenstack/Writer.h>
+#include <libgreenstack/Reader.h>
 #include <cassert>
-
-#include "Writer.h"
-#include "Reader.h"
-
 
 size_t Greenstack::Frame::encode(const Message *message, std::vector<uint8_t> &vector, size_t offset)  {
     ByteArrayWriter writer(vector, offset);
@@ -29,24 +27,17 @@ size_t Greenstack::Frame::encode(const Message *message, std::vector<uint8_t> &v
     return nb + 4;
 }
 
-Greenstack::Message *Greenstack::Frame::create(const std::vector<uint8_t> &vector, size_t offset, size_t &nbytes) {
-    assert(offset < vector.size());
-    size_t currsize = vector.size();
-
-    if (currsize < 4) {
-        // we need the header size...
+Greenstack::Message *Greenstack::Frame::create(Greenstack::Reader &reader) {
+    if (reader.getRemainder() < 4) {
         return nullptr;
     }
 
-    ByteArrayReader reader(vector, offset);
     uint32_t size;
     reader.read(size);
 
-    if (currsize < (size + 4)) {
-        // we need more data
+    if (reader.getRemainder() < size) {
         return nullptr;
     }
 
-    nbytes = size + 4;
-    return Message::create(vector, offset + 4, offset + nbytes);
+    return Message::create(reader, size);
 }
